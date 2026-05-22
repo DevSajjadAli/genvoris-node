@@ -1,0 +1,115 @@
+import type { GenvorisConfig } from './types.js';
+import {
+  GenvorisAPIError,
+  GenvorisAuthError,
+  GenvorisRateLimitError,
+  GenvorisValidationError,
+} from './errors.js';
+
+export interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  query?: Record<string, string | number | boolean | undefined | null>;
+}
+
+const RETRY_STATUSES = new Set([429, 502, 503, 504]);
+const MAX_DELAY_MS = 8_000;
+const DEFAULT_BASE_URL = 'https://genvoris.org/api/v1';
+const SDK_VERSION = '1.0.0';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function request<T>(
+  config: GenvorisConfig,
+  path: string,
+  opts: RequestOptions = {},
+  attempt = 0,
+): Promise<T> {
+  const { method = 'GET', body, query } = opts;
+  const fetchFn = config.fetch ?? globalThis.fetch;
+  const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
+
+  let url = `${baseUrl}${path}`;
+  if (query) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== null) params.set(k, String(v));
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const controller = new AbortController();
+  const timerId = setTimeout(
+    () => controller.abort(),
+    config.timeoutMs ?? 30_000,
+  );
+
+  let res: Response;
+  try {
+    res = await fetchFn(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': `genvoris-node/${SDK_VERSION}`,
+        ...config.defaultHeaders,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timerId);
+  }
+
+  if (res.ok) {
+    if (res.status === 204) return undefined as unknown as T;
+    return res.json() as Promise<T>;
+  }
+
+  const requestId = res.headers.get('x-request-id') ?? undefined;
+  let errBody: Record<string, unknown> = {};
+  try {
+    errBody = (await res.json()) as Record<string, unknown>;
+  } catch {
+    // swallow parse errors
+  }
+
+  const code = (errBody.error as string) ?? 'unknown_error';
+  const message = (errBody.message as string) ?? code;
+
+  // Retry transient errors with exponential backoff + full jitter
+  if (RETRY_STATUSES.has(res.status)) {
+    const maxRetries = config.maxRetries ?? 3;
+    if (attempt < maxRetries) {
+      const base = Math.min(Math.pow(2, attempt) * 250, MAX_DELAY_MS);
+      const delay = Math.random() * base;
+      await sleep(delay);
+      return request<T>(config, path, opts, attempt + 1);
+    }
+  }
+
+  const errorBase = { status: res.status, code, message, requestId };
+
+  if (res.status === 401 || res.status === 403) {
+    throw new GenvorisAuthError(errorBase);
+  }
+  if (res.status === 429) {
+    const retryAfter = res.headers.get('retry-after');
+    throw new GenvorisRateLimitError({
+      ...errorBase,
+      retryAfterSeconds: retryAfter ? Number(retryAfter) : 60,
+    });
+  }
+  if (res.status === 400 || res.status === 422) {
+    throw new GenvorisValidationError({
+      ...errorBase,
+      fieldErrors:
+        (errBody.fieldErrors as Record<string, string[]>) ?? {},
+    });
+  }
+
+  throw new GenvorisAPIError(errorBase);
+}
