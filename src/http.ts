@@ -80,12 +80,16 @@ export async function request<T>(
   const code = (errBody.error as string) ?? 'unknown_error';
   const message = (errBody.message as string) ?? code;
 
-  // Retry transient errors with exponential backoff + full jitter
+  // Retry transient errors with exponential backoff + decorated jitter.
+  // delay = 250ms * 2^attempt * (0.7 + random*0.6) -> ±30% spread around the
+  // exponential target so concurrent clients de-correlate their retries
+  // instead of all firing in the same [0, base] window (full jitter).
   if (RETRY_STATUSES.has(res.status)) {
     const maxRetries = config.maxRetries ?? 3;
     if (attempt < maxRetries) {
-      const base = Math.min(Math.pow(2, attempt) * 250, MAX_DELAY_MS);
-      const delay = Math.random() * base;
+      const target = Math.pow(2, attempt) * 250;
+      const jittered = target * (0.7 + Math.random() * 0.6);
+      const delay = Math.min(jittered, MAX_DELAY_MS);
       await sleep(delay);
       return request<T>(config, path, opts, attempt + 1);
     }

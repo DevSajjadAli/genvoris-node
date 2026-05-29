@@ -12,6 +12,13 @@ export interface SessionMintParams {
   ttlSeconds?: number;
 }
 
+export interface SessionRevokeParams {
+  /** Genvoris customer ID or your `externalId`. */
+  customerId: string;
+  /** The `jti` claim of the session token to revoke. */
+  jti: string;
+}
+
 // ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
@@ -30,6 +37,11 @@ export interface MintedSession {
     monthly_try_ons: number | null;
     period_end: string | null;
   };
+}
+
+export interface RevokedSession {
+  jti: string;
+  revoked: true;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +65,21 @@ export class SessionsResource {
         method: 'POST',
         body: ttlSeconds !== undefined ? { expires_in: ttlSeconds } : undefined,
       },
+    );
+  }
+
+  /**
+   * Revoke a previously minted session token by its `jti` claim.
+   *
+   * Use this on end-customer logout or when a token is suspected
+   * compromised. The token is rejected immediately even though its
+   * signature and expiry are otherwise still valid. Idempotent.
+   */
+  revoke({ customerId, jti }: SessionRevokeParams): Promise<RevokedSession> {
+    return request<RevokedSession>(
+      this.config,
+      `/customers/${encodeURIComponent(customerId)}/sessions/${encodeURIComponent(jti)}`,
+      { method: 'DELETE' },
     );
   }
 }
