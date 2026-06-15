@@ -10,6 +10,9 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
+  /** When set, Content-Type defaults to application/json. Override for
+   *  non-JSON payloads (e.g. multipart/form-data for image uploads). */
+  contentType?: string;
 }
 
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
@@ -27,7 +30,7 @@ export async function request<T>(
   opts: RequestOptions = {},
   attempt = 0,
 ): Promise<T> {
-  const { method = 'GET', body, query } = opts;
+  const { method = 'GET', body, query, contentType } = opts;
   const fetchFn = config.fetch ?? globalThis.fetch;
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
 
@@ -41,6 +44,8 @@ export async function request<T>(
     if (qs) url += `?${qs}`;
   }
 
+  // Create a FRESH AbortController per attempt so a timeout on one
+  // retry does not abort the next attempt's request.
   const controller = new AbortController();
   const timerId = setTimeout(
     () => controller.abort(),
@@ -49,20 +54,37 @@ export async function request<T>(
 
   let res: Response;
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${config.apiKey}`,
+      'User-Agent': `genvoris-node/${SDK_VERSION}`,
+      ...config.defaultHeaders,
+    };
+    // Only set Content-Type when we have a body OR a contentType override.
+    // When contentType is explicitly provided (e.g. multipart/form-data),
+    // use that; otherwise default to application/json.
+    if (body !== undefined || contentType) {
+      headers['Content-Type'] = contentType ?? 'application/json';
+    }
+
     res = await fetchFn(url, {
       method,
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': `genvoris-node/${SDK_VERSION}`,
-        ...config.defaultHeaders,
-      },
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-  } finally {
+  } catch (err) {
     clearTimeout(timerId);
+    // On network error (including AbortError/timeout), retry if attempts remain.
+    if (attempt < (config.maxRetries ?? 3)) {
+      const target = Math.pow(2, attempt) * 250;
+      const jittered = target * (0.7 + Math.random() * 0.6);
+      const delay = Math.min(jittered, MAX_DELAY_MS);
+      await sleep(delay);
+      return request<T>(config, path, opts, attempt + 1);
+    }
+    throw err;
   }
+  clearTimeout(timerId);
 
   if (res.ok) {
     if (res.status === 204) return undefined as unknown as T;
