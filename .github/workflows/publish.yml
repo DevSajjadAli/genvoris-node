@@ -35,5 +35,3 @@ jobs:
       - name: Publish package
         # The --provenance flag links the npm package back to this specific GitHub Actions workflow
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
