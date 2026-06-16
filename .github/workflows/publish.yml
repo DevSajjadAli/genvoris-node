@@ -33,7 +33,8 @@ jobs:
         run: npm test
 
       - name: Publish package
+        # npm 10.8.0+ supports secretless authentication via OIDC!
         # The --provenance flag links the npm package back to this specific GitHub Actions workflow
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm install -g npm@latest
+          npm publish --provenance --access public
