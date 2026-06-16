@@ -57,6 +57,7 @@ export async function request<T>(
     const headers: Record<string, string> = {
       Authorization: `Bearer ${config.apiKey}`,
       'User-Agent': `genvoris-node/${SDK_VERSION}`,
+      Accept: 'application/json',
       ...config.defaultHeaders,
     };
     // Only set Content-Type when we have a body OR a contentType override.
@@ -99,8 +100,8 @@ export async function request<T>(
     // swallow parse errors
   }
 
-  const code = (errBody.error as string) ?? 'unknown_error';
-  const message = (errBody.message as string) ?? code;
+  const code = (errBody.error as string) || 'unknown_error';
+  const message = (errBody.message as string) || code;
 
   // Retry transient errors with exponential backoff + decorated jitter.
   // delay = 250ms * 2^attempt * (0.7 + random*0.6) -> ±30% spread around the

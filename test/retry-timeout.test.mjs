@@ -127,7 +127,7 @@ test('request aborts the in-flight fetch when the timeout elapses', async () => 
 
 test('webhook verify rejects a stale timestamp (> tolerance)', () => {
   const SECRET = 'whsec_test_stale';
-  const payload = JSON.stringify({ event: 'tryon.completed', id: 'evt_old' });
+  const payload = JSON.stringify({ type: 'tryon.completed', id: 'evt_old' });
   const staleTs = Math.floor(Date.now() / 1_000) - 400; // 400s > 300s tolerance
   const hex = createHmac('sha256', SECRET)
     .update(`${staleTs}.${payload}`)

@@ -68,6 +68,9 @@ export interface GenvorisEvent<
 
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) throw new Error('genvoris: invalid hex string');
+  if (!/^[a-f0-9]+$/i.test(hex)) {
+    throw new Error('genvoris: invalid hex string — non-hex characters');
+  }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);

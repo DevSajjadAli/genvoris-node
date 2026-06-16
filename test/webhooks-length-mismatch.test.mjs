@@ -17,7 +17,7 @@ import { createHmac } from 'node:crypto';
 import { WebhooksResource } from '../dist/index.mjs';
 
 const SECRET = 'whsec_test_phase6';
-const payload = JSON.stringify({ event: 'tryon.completed', id: 'evt_1' });
+const payload = JSON.stringify({ type: 'tryon.completed', id: 'evt_1' });
 const ts = Math.floor(Date.now() / 1_000);
 
 test('verify() throws "signature mismatch" on v1 of wrong byte length', () => {
@@ -47,6 +47,6 @@ test('verify() accepts a correctly-signed payload', () => {
   const header = `t=${ts},v1=${hex}`;
 
   const evt = WebhooksResource.verify({ payload, header, secret: SECRET });
-  assert.equal(evt.event, 'tryon.completed');
+  assert.equal(evt.type, 'tryon.completed');
   assert.equal(evt.id, 'evt_1');
 });
