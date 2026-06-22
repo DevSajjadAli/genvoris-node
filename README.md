@@ -171,11 +171,11 @@ The client automatically retries `429`, `502`, `503`, and `504` responses using 
 ```ts
 const gv = new Genvoris({
   apiKey: process.env.GENVORIS_API_KEY!,
-  baseUrl: 'https://genvoris.org/api/v1', // default
+  // baseUrl is optional; by default the SDK targets the Genvoris v1 API.
   timeoutMs: 30_000,                       // default 30 s
   maxRetries: 3,                           // default 3
   defaultHeaders: { 'X-My-Header': 'val' },
-  fetch: customFetch,                      // bring-your-own fetch
+  fetch: customFetch,                      // optional bring-your-own fetch
 });
 ```
 

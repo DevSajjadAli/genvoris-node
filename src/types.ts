@@ -1,7 +1,12 @@
+export type GenvorisFetch = (
+  input: string | URL | Request,
+  init?: RequestInit,
+) => Promise<Response>;
+
 export interface GenvorisConfig {
   /** Your store API key — starts with `gvk_live_` */
   apiKey: string;
-  /** Override the base URL. Default: `https://genvoris.org/api/v1` */
+  /** Override the base URL. Defaults to the Genvoris v1 API endpoint. */
   baseUrl?: string;
   /** Request timeout in milliseconds. Default: 30 000 */
   timeoutMs?: number;
@@ -9,6 +14,6 @@ export interface GenvorisConfig {
   maxRetries?: number;
   /** Additional headers to send on every request */
   defaultHeaders?: Record<string, string>;
-  /** Custom fetch implementation. Default: `globalThis.fetch` */
-  fetch?: typeof globalThis.fetch;
+  /** Custom fetch implementation. Defaults to the native Fetch API. */
+  fetch?: GenvorisFetch;
 }

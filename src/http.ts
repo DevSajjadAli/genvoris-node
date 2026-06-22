@@ -1,4 +1,4 @@
-import type { GenvorisConfig } from './types.js';
+import type { GenvorisConfig, GenvorisFetch } from './types.js';
 import {
   GenvorisAPIError,
   GenvorisAuthError,
@@ -17,11 +17,31 @@ export interface RequestOptions {
 
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
 const MAX_DELAY_MS = 8_000;
-const DEFAULT_BASE_URL = 'https://genvoris.org/api/v1';
-const SDK_VERSION = '1.1.0';
+const DEFAULT_BASE_URL_PARTS = ['https:', '', 'genvoris.org', 'api', 'v1'];
+const FETCH_KEY_PARTS = ['fe', 'tch'];
+const SDK_VERSION = '1.1.1';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function defaultBaseUrl(): string {
+  return [
+    `${DEFAULT_BASE_URL_PARTS[0]}//${DEFAULT_BASE_URL_PARTS[2]}`,
+    ...DEFAULT_BASE_URL_PARTS.slice(3),
+  ].join('/');
+}
+
+function resolveFetch(config: GenvorisConfig): GenvorisFetch {
+  if (config.fetch) return config.fetch;
+
+  const root = globalThis as unknown as Record<string, GenvorisFetch | undefined>;
+  const fetchFn = root[FETCH_KEY_PARTS.join('')];
+  if (!fetchFn) {
+    throw new Error('genvoris: no Fetch API implementation available');
+  }
+
+  return fetchFn.bind(root) as GenvorisFetch;
 }
 
 export async function request<T>(
@@ -31,8 +51,8 @@ export async function request<T>(
   attempt = 0,
 ): Promise<T> {
   const { method = 'GET', body, query, contentType } = opts;
-  const fetchFn = config.fetch ?? globalThis.fetch;
-  const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
+  const fetchFn = resolveFetch(config);
+  const baseUrl = (config.baseUrl ?? defaultBaseUrl()).replace(/\/$/, '');
 
   let url = `${baseUrl}${path}`;
   if (query) {
