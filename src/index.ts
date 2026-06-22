@@ -3,6 +3,9 @@ import { CustomersResource } from './resources/customers.js';
 import { PlansResource } from './resources/plans.js';
 import { SessionsResource } from './resources/sessions.js';
 import { WebhooksResource } from './resources/webhooks.js';
+import { EventsResource } from './resources/events.js';
+import { ConversionsResource } from './resources/conversions.js';
+import { ReturnsResource } from './resources/returns.js';
 
 // Re-export error classes for named imports
 export {
@@ -42,6 +45,18 @@ export type {
   WebhookEndpointList,
   GenvorisEvent,
 } from './resources/webhooks.js';
+export type {
+  WidgetEventType,
+  WidgetEventInput,
+  EventBatchInput,
+  EventsAccepted,
+} from './resources/events.js';
+export type {
+  ConversionPlatform,
+  ConversionCreateParams,
+  ConversionEvent,
+} from './resources/conversions.js';
+export type { ReturnCreateParams, ReturnEvent } from './resources/returns.js';
 
 /**
  * Official Genvoris Node.js SDK client.
@@ -60,6 +75,9 @@ export default class Genvoris {
   readonly plans: PlansResource;
   readonly sessions: SessionsResource;
   readonly webhooks: WebhooksResource;
+  readonly events: EventsResource;
+  readonly conversions: ConversionsResource;
+  readonly returns: ReturnsResource;
 
   constructor(config: GenvorisConfig) {
     if (!config?.apiKey) {
@@ -69,5 +87,8 @@ export default class Genvoris {
     this.plans = new PlansResource(config);
     this.sessions = new SessionsResource(config);
     this.webhooks = new WebhooksResource(config);
+    this.events = new EventsResource(config);
+    this.conversions = new ConversionsResource(config);
+    this.returns = new ReturnsResource(config);
   }
 }

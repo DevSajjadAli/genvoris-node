@@ -17,6 +17,7 @@ npm install @genvoris/node
 ```ts
 import Genvoris from '@genvoris/node';
 
+// Server-side only. Never expose GENVORIS_API_KEY in browser code.
 const gv = new Genvoris({ apiKey: process.env.GENVORIS_API_KEY! });
 
 // Create a customer
@@ -61,6 +62,47 @@ await gv.plans.archive(id)
 await gv.sessions.mint({ customerId, ttlSeconds? })
 ```
 
+### Events
+
+```ts
+await gv.events.track({
+  sessionId: 'session_12345678',
+  eventType: 'WIDGET_OPENED',
+  productId: 'sku_123',
+  productTitle: 'Linen Shirt',
+  pageUrl: 'https://store.example/products/linen-shirt',
+})
+
+await gv.events.trackBatch([
+  { sessionId, eventType: 'PHOTO_UPLOADED' },
+  { sessionId, eventType: 'TRYON_GENERATED', productId },
+])
+```
+
+### Conversions and returns
+
+```ts
+await gv.conversions.create({
+  orderId: 'order_1001',
+  platform: 'custom',
+  amountCents: 12900,
+  currency: 'USD',
+  quantity: 1,
+  productId: 'sku_123',
+  productTitle: 'Linen Shirt',
+  sessionId: 'session_12345678',
+  customerEmail: 'shopper@example.com',
+})
+
+await gv.returns.create({
+  orderId: 'order_1001',
+  platform: 'custom',
+  refundedAmountCents: 12900,
+  currency: 'USD',
+  reason: 'size_exchange',
+})
+```
+
 ### Webhooks
 
 ```ts
@@ -69,6 +111,16 @@ await gv.webhooks.create({ url, secret, events })
 await gv.webhooks.test(id)
 await gv.webhooks.delete(id)
 ```
+
+## Hosted widget integration
+
+Use this SDK from your backend to mint short-lived customer session tokens, record conversions/returns, and verify webhooks. For browser-hosted widgets, route try-on and analytics calls through your own same-origin endpoint or another approved public-widget flow; do not place `gvk_live_...` keys in HTML or client JavaScript.
+
+A typical flow is:
+
+1. Backend uses `gv.customers.create(...)` and `gv.sessions.mint(...)`.
+2. Frontend loads `https://api.genvoris.org/widget.js?no_fab=1` with a same-origin `data-api-url`/`data-events-url` and the minted customer token.
+3. Backend records orders with `gv.conversions.create(...)` and refunds with `gv.returns.create(...)`.
 
 ## Webhook verification
 
@@ -118,7 +170,7 @@ The client automatically retries `429`, `502`, `503`, and `504` responses using 
 
 ```ts
 const gv = new Genvoris({
-  apiKey: 'gvk_live_...',
+  apiKey: process.env.GENVORIS_API_KEY!,
   baseUrl: 'https://genvoris.org/api/v1', // default
   timeoutMs: 30_000,                       // default 30 s
   maxRetries: 3,                           // default 3
