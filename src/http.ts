@@ -18,7 +18,7 @@ export interface RequestOptions {
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
 const MAX_DELAY_MS = 8_000;
 const DEFAULT_BASE_URL = 'https://genvoris.org/api/v1';
-const SDK_VERSION = '1.0.1';
+const SDK_VERSION = '1.1.0';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
